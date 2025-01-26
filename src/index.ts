@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   `)
   );
 
-  const refCode = await prompt(chalk.yellow("Enter Referral Code: "));
+  const refCode = "RJ3K5FIo";//await prompt(chalk.yellow("Enter Referral Code: "));
   const count = parseInt(await prompt(chalk.yellow("How many do you want? ")));
   const proxiesLoaded = loadProxies();
   if (!proxiesLoaded) {
