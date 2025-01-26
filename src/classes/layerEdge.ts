@@ -3,6 +3,8 @@ import chalk from "chalk";
 import Web3 from "web3";
 import { logMessage } from "../utils/logger";
 import { getProxyAgent } from "./proxy";
+import http from 'http';
+import https from 'https';
 
 export class layerEdgeRefferal {
   private refCode: string;
@@ -13,10 +15,36 @@ export class layerEdgeRefferal {
   constructor(refCode: string, proxy: string | null = null) {
     this.refCode = refCode;
     this.proxy = proxy;
-    this.axiosConfig = {
-      ...(this.proxy && { httpsAgent: getProxyAgent(this.proxy) }),
-      timeout: 60000,
+    
+    // Create base agent configuration
+    const agentConfig = {
+      keepAlive: true,
+      timeout: 30000,
+      keepAliveMsecs: 5000,
     };
+
+    // Configure agents based on proxy or direct connection
+    if (this.proxy) {
+      const proxyAgent = getProxyAgent(this.proxy);
+      this.axiosConfig = {
+        httpsAgent: proxyAgent,
+        timeout: 30000,
+        maxRedirects: 5,
+        validateStatus: (status: number): boolean => status < 500,
+      };
+    } else {
+      this.axiosConfig = {
+        httpAgent: new http.Agent(agentConfig),
+        httpsAgent: new https.Agent({
+          ...agentConfig,
+          rejectUnauthorized: false
+        }),
+        timeout: 30000,
+        maxRedirects: 5,
+        validateStatus: (status: number): boolean => status < 500,
+      };
+    }
+
     const web3 = new Web3();
     this.wallet = web3.eth.accounts.create();
   }
@@ -25,33 +53,56 @@ export class layerEdgeRefferal {
     return this.wallet;
   }
 
+  private async delay(ms: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async makeRequest(method: string, url: string, config: any = {}, retries: number = 3): Promise<AxiosResponse | null> {
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await axios({
+        const requestConfig = {
           method,
           url,
           ...this.axiosConfig,
           ...config,
-        });
+          headers: {
+            'Connection': 'keep-alive',
+            'Keep-Alive': 'timeout=30',
+            ...config.headers,
+          },
+        };
+
+        const response = await axios(requestConfig);
         return response;
-      } catch (error) {
+      } catch (error: any) {
+        const errorMessage = error.message;
+        const isConnectionError = errorMessage.includes('socket') || 
+                                errorMessage.includes('TLS') || 
+                                errorMessage.includes('timeout') ||
+                                errorMessage.includes('network');
+
+        if (isConnectionError) {
+          logMessage(null, null, `Connection error: ${errorMessage}`, "error");
+          if (i < retries - 1) {
+            const delayTime = Math.min(2000 * (i + 1), 10000);
+            await this.delay(delayTime);
+            continue;
+          }
+        }
+
         if (i === retries - 1) {
-          logMessage(null, null, `Request failed: ${(error as any).message}`, "error");
+          logMessage(null, null, `Request failed: ${errorMessage}`, "error");
           if (this.proxy) {
             logMessage(null, null, `Failed proxy: ${this.proxy}`, "error");
           }
           return null;
         }
 
-        
-        process.stdout.write(chalk.yellow(`Retrying... (${i + 1}/${retries})\r`));
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await this.delay(2000);
       }
     }
     return null;
   }
-
 
   async checkInvite(): Promise<boolean> {
     const inviteData = {
@@ -70,20 +121,20 @@ export class layerEdgeRefferal {
     }
   }
 
-  async regsiterWallet(): Promise<boolean> {
-    const registeData = {
+  async registerWallet(): Promise<boolean> {
+    const registerData = {
       walletAddress: this.wallet.address,
     };
   
     const response = await this.makeRequest("post", `https://referral.layeredge.io/api/referral/register-wallet/${this.refCode}`, {
-      data: registeData,
+      data: registerData,
     });
   
-    if (response && response.data ) {
-      logMessage(null, null, "Wallet succesfull register", "success");
+    if (response && response.data) {
+      logMessage(null, null, "Wallet successfully registered", "success");
       return true;
     } else {
-      logMessage(null, null, "Failed Refferal", "error");
+      logMessage(null, null, "Failed Referral", "error");
       return false;
     }
   }
@@ -113,7 +164,7 @@ export class layerEdgeRefferal {
     }
   }
 
-  async cekNodeStatus():Promise<boolean> { 
+  async checkNodeStatus(): Promise<boolean> {
     const response = await this.makeRequest("get", `https://referral.layeredge.io/api/light-node/node-status/${this.wallet.address}`);
     if (response && response.data && response.data.data.startTimestamp !== null) {
       logMessage(null, null, "Node Status Running", "success");

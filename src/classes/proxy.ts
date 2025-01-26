@@ -61,7 +61,7 @@ export async function checkIP(): Promise<boolean> {
   try {
     const response = await axios.get(
       "https://api.ipify.org?format=json",
-      axiosConfig
+      { ...axiosConfig, timeout: 10000 } // Set timeout to 10 seconds
     );
     const ip = response.data.ip;
     console.log(chalk.green(`[+] Ip Using: ${ip}`));
@@ -95,6 +95,7 @@ export async function getRandomProxy(): Promise<string | null> {
       return proxy;
     } catch (error) {
       proxyAttempt++;
+      await new Promise((resolve) => setTimeout(resolve, 10000)); // Add delay before retrying
     }
   }
 
@@ -102,4 +103,4 @@ export async function getRandomProxy(): Promise<string | null> {
   axiosConfig = {};
   await checkIP();
   return null;
-}   
+}

@@ -34,7 +34,7 @@ async function main(): Promise<void> {
 
     const valid = await layerEdge.checkInvite();
     if (valid) {
-      const registerSuccess = await layerEdge.regsiterWallet();
+      const registerSuccess = await layerEdge.registerWallet();
       if (registerSuccess) {
         successful++;
         const wallet = layerEdge.getWallet();
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
         accountsLayerEdge.write(`===================================================================\n`);
         const nodeConnected = await layerEdge.connectNode();
         if (nodeConnected) {
-          await layerEdge.cekNodeStatus();
+          await layerEdge.checkNodeStatus();
         }
       }
     }
@@ -50,9 +50,9 @@ async function main(): Promise<void> {
 
   accountsLayerEdge.end();
 
-  console.log(chalk.magenta("\n[*] Dono bang!"));
-  console.log(chalk.green(`[*] Account dono ${successful} dari ${count} akun`));
-  console.log(chalk.magenta("[*] Result in accounts.txt"));
+  console.log(chalk.magenta("\n[*] Done!"));
+  console.log(chalk.green(`[*] Successfully created ${successful} out of ${count} accounts`));
+  console.log(chalk.magenta("[*] Results in accounts.txt"));
   rl.close(); 
 }
 
